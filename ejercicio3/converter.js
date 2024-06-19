@@ -6,11 +6,61 @@ class Currency {
 }
 
 class CurrencyConverter {
-    constructor() {}
+    constructor(apiUrl) {
+        this.apiUrl = apiUrl;
+        this.currencies = [];
+    }
 
-    getCurrencies(apiUrl) {}
+    async getCurrencies() {
+        try {
+            const response = await fetch(`${this.apiUrl}/currencies`);
+            const data = await response.json();
+            this.currencies = Object.keys(data).map(code => new Currency(code, data[code]));
+        } catch (error) {
+            console.error("Error fetching currencies:", error);
+        }
+    }
 
-    convertCurrency(amount, fromCurrency, toCurrency) {}
+    async convertCurrency(amount, fromCurrency, toCurrency) {
+        if (fromCurrency.code === toCurrency.code) {
+            return parseFloat(amount);
+        }
+        
+        try {
+            const response = await fetch(
+                `${this.apiUrl}/latest?amount=${amount}&from=${fromCurrency.code}&to=${toCurrency.code}`
+            );
+            const data = await response.json();
+            return data.rates[toCurrency.code];
+        } catch (error) {
+            console.error("Error converting currency:", error);
+            return null;
+        }
+    }
+
+    async getExchangeRateDifference(fromCurrency, toCurrency) {
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 864e5).toISOString().split('T')[0];
+
+        try {
+            const responseToday = await fetch(
+                `${this.apiUrl}/${today}?from=${fromCurrency.code}&to=${toCurrency.code}`
+            );
+            const dataToday = await responseToday.json();
+            const rateToday = dataToday.rates[toCurrency.code];
+
+            const responseYesterday = await fetch(
+                `${this.apiUrl}/${yesterday}?from=${fromCurrency.code}&to=${toCurrency.code}`
+            );
+            const dataYesterday = await responseYesterday.json();
+            const rateYesterday = dataYesterday.rates[toCurrency.code];
+
+            return rateToday - rateYesterday;
+        } catch (error) {
+            console.error("Error fetching exchange rate difference:", error);
+            return null;
+        }
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -43,9 +93,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
 
         if (convertedAmount !== null && !isNaN(convertedAmount)) {
-            resultDiv.textContent = `${amount} ${
-                fromCurrency.code
-            } son ${convertedAmount.toFixed(2)} ${toCurrency.code}`;
+            resultDiv.textContent = `${amount} ${fromCurrency.code} son ${convertedAmount.toFixed(2)} ${toCurrency.code}`;
         } else {
             resultDiv.textContent = "Error al realizar la conversión.";
         }
